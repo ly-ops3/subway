@@ -64,8 +64,8 @@ export default defineNuxtConfig({
       script: [
         {
           'defer': true,
-          'data-domain': 'subway.cuvii.dev',
-          'src': 'https://plausible.cuvii.dev/js/script.js',
+          'data-website-id': 'a98914db-8947-4a51-9ea1-52acf9d2159e',
+          'src': 'https://umami.cuvii.dev/script.js',
         },
       ],
     },
