@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const DATA_FILE = fileURLToPath(new URL('../datasource/data.json', import.meta.url))
 const SUBWAY_API = 'https://map.amap.com/service/subway?srhdata='
 const LINE_API = 'https://restapi.amap.com/v3/bus/lineid'
-const AMAP_KEY = process.env.AMAP_KEY
+const AMAP_KEY = process.env.AMAP_KEY?.trim()
 const DRY_RUN = process.argv.includes('--dry-run')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -39,12 +39,18 @@ function parseCoord(sl) {
 
 async function fetchRealPolyline(lineId) {
   const url = `${LINE_API}?id=${lineId}&extensions=all&output=json&key=${AMAP_KEY}`
-  const res = await getJSON(url)
-  if (res.status !== '1')
-    throw new Error(`高德 Web 服务返回错误: ${res.info}`)
-  const polyline = res.buslines?.[0]?.polyline
-  await sleep(200)
-  return polyline ? polyline.split(';').map(p => p.split(',').map(Number)) : null
+  for (let attempt = 1; ; attempt++) {
+    const res = await getJSON(url)
+    await sleep(350)
+    if (res.status === '1') {
+      const polyline = res.buslines?.[0]?.polyline
+      return polyline ? polyline.split(';').map(p => p.split(',').map(Number)) : null
+    }
+    // QPS 超限时重试，其余错误（如 Key 无效、日配额用尽）直接终止
+    if (!res.info?.includes('CUQPS') || attempt >= 5)
+      throw new Error(`高德 Web 服务返回错误: ${res.info}`)
+    await sleep(1000 * attempt)
+  }
 }
 
 // 高德会改换乘站的 id，按站名比较
