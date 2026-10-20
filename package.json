@@ -11,8 +11,7 @@
     "postinstall": "nuxi prepare",
     "generate": "nuxi generate",
     "start:generate": "npx serve .output/public",
-    "data:lines": "tsx ./scripts/fetchLines",
-    "data:polyline": "tsx ./scripts/fetchPolyline"
+    "data:update": "node ./scripts/update-data.mjs"
   },
   "dependencies": {
     "@deck.gl/core": "^8.9.35",

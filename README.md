@@ -33,6 +33,7 @@
 - 📅 **数据时间**: 截止至 2023年6月
 - 🏙️ **覆盖城市**: 包含北京、上海、广州、深圳等主要城市
 
+- 🔄 **更新数据**: `pnpm data:update` 从高德地铁图拉取最新线路和站点并写入 `datasource/data.json`（加 `--dry-run` 只打印变化）。设置 `AMAP_KEY`（[高德开放平台](https://console.amap.com/dev/key/app) Web 服务 Key）可同时获取线路真实走向，否则新线路和站点有变化的线路会以站点连线显示
 
 ## 许可证
 
