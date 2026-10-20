@@ -9,7 +9,7 @@ export function useDataset() {
     rawData.map((city) => {
       const lines = city.lines.map((line) => {
         const stations = line.stations.map(station => ({ id: station.id, name: station.name, coord: transformGCJ02([station.lng, station.lat]) }))
-        const polyline = partialPolyline((line.fullPolyline.length ? line.fullPolyline.map(p => transformGCJ02(p as [number, number])) : extractPolyline(line.polyline)) as [number, number][], 3)
+        const polyline = (line.fullPolyline.length ? line.fullPolyline.map(p => transformGCJ02(p as [number, number])) : extractPolyline(line.polyline)) as [number, number][]
         return {
           id: line.id,
           cityId: city.id,
@@ -75,16 +75,6 @@ function getCityBound(lines: Line[]) {
   }
 
   return [[minLng, minLat], [maxLng, maxLat]] as Bound
-}
-
-function partialPolyline(polyline: [number, number][], step: number) {
-  const newPolyline = [polyline[0]]
-
-  polyline.slice(1, polyline.length - 1).forEach((p, idx) => {
-    idx % step === 0 && newPolyline.push(p)
-  })
-
-  return [...newPolyline, polyline[polyline.length - 1]]
 }
 
 /**

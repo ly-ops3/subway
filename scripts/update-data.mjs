@@ -9,6 +9,9 @@ const SUBWAY_API = 'https://map.amap.com/service/subway?srhdata='
 const LINE_API = 'https://restapi.amap.com/v3/bus/lineid'
 const AMAP_KEY = process.env.AMAP_KEY?.trim()
 const DRY_RUN = process.argv.includes('--dry-run')
+// 走向简化容差（米），以及坐标保留的小数位（5 位约 1 米）
+const SIMPLIFY_TOLERANCE = 3
+const COORD_DIGITS = 5
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -22,7 +25,7 @@ async function getJSON(url) {
     }
     catch (err) {
       if (attempt >= 3)
-        throw new Error(`${url}: ${err.message}`)
+        throw new Error(`${url.replace(/key=[^&]*/, 'key=***')}: ${err.message}`)
       await sleep(1000 * attempt)
     }
   }
@@ -51,6 +54,41 @@ async function fetchRealPolyline(lineId) {
       throw new Error(`高德 Web 服务返回错误: ${res.info}`)
     await sleep(1000 * attempt)
   }
+}
+
+// Douglas-Peucker 简化：去掉偏离前后连线不超过容差的点
+function simplifyPolyline(points) {
+  const round = n => Number(n.toFixed(COORD_DIGITS))
+  if (points.length < 3)
+    return points.map(p => p.map(round))
+
+  const kx = Math.cos(points[0][1] * Math.PI / 180) * 111320
+  const xy = points.map(([lng, lat]) => [lng * kx, lat * 111320])
+  const keep = new Uint8Array(points.length)
+  keep[0] = keep[points.length - 1] = 1
+  const stack = [[0, points.length - 1]]
+  while (stack.length) {
+    const [a, b] = stack.pop()
+    const [ax, ay] = xy[a]
+    const dx = xy[b][0] - ax
+    const dy = xy[b][1] - ay
+    const len = Math.hypot(dx, dy)
+    let maxDist = 0
+    let index = -1
+    for (let i = a + 1; i < b; i++) {
+      const [px, py] = xy[i]
+      const dist = len ? Math.abs(dx * (ay - py) - dy * (ax - px)) / len : Math.hypot(px - ax, py - ay)
+      if (dist > maxDist) {
+        maxDist = dist
+        index = i
+      }
+    }
+    if (maxDist > SIMPLIFY_TOLERANCE) {
+      keep[index] = 1
+      stack.push([a, index], [index, b])
+    }
+  }
+  return points.filter((_, i) => keep[i]).map(p => p.map(round))
 }
 
 // 高德会改换乘站的 id，按站名比较
@@ -105,8 +143,11 @@ async function main() {
     const oldLines = new Map((oldCity?.lines ?? []).map(l => [l.id, l]))
     const stats = { real: 0, reused: 0, straight: [] }
     const lines = []
-    for (const rawLine of raw.l.filter(l => l.su === '1'))
-      lines.push(await buildLine(rawLine, oldLines.get(rawLine.ls), stats))
+    for (const rawLine of raw.l.filter(l => l.su === '1')) {
+      const line = await buildLine(rawLine, oldLines.get(rawLine.ls), stats)
+      line.fullPolyline = simplifyPolyline(line.fullPolyline)
+      lines.push(line)
+    }
 
     const city = { id: meta.adcode, name: oldCity?.name ?? shortCityName(meta.cityname), cityname: meta.spell, lines }
     cities.push(city)
